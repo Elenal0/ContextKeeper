@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Admin & Observability — ContextKeeper{% endblock %}
+
+{% block content %}
+<div x-data="adminApp()">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Admin Observability & AI Traceability</h1>
+      <p class="text-sm text-slate-500 mt-1">Live inspection of AI runs, structured JSON logs, latency, and request-ID correlation.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="password" x-model="adminToken" placeholder="Enter ADMIN_TOKEN..." class="text-xs rounded-lg border-slate-300 py-1.5 px-3 focus:ring-indigo-500">
+      <button @click="loadData()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700">
+        Unlock Data
+      </button>
+    </div>
+  </div>
+
+  <!-- Tabs: AI Runs vs Raw Logs -->
+  <div class="border-b border-slate-200 flex space-x-6 text-xs font-semibold mb-6">
+    <button @click="tab = 'ai_runs'" :class="tab === 'ai_runs' ? 'border-b-2 border-indigo-600 text-indigo-600 pb-3' : 'text-slate-500 hover:text-slate-700 pb-3'">
+      🤖 AI Runs Table (<span x-text="aiRuns.length"></span>)
+    </button>
+    <button @click="tab = 'logs'" :class="tab === 'logs' ? 'border-b-2 border-indigo-600 text-indigo-600 pb-3' : 'text-slate-500 hover:text-slate-700 pb-3'">
+      📄 Application JSON Log Tail (<span x-text="logs.length"></span> lines)
+    </button>
+  </div>
+
+  <!-- AI Runs Tab -->
+  <div x-show="tab === 'ai_runs'" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-slate-200 text-xs">
+      <thead class="bg-slate-50 font-semibold text-slate-500 uppercase tracking-wider">
+        <tr>
+          <th class="px-4 py-3 text-left">Feature</th>
+          <th class="px-3 py-3 text-left">Provider & Model</th>
+          <th class="px-3 py-3 text-left">Prompt Version</th>
+          <th class="px-3 py-3 text-center">Status</th>
+          <th class="px-3 py-3 text-right">Latency</th>
+          <th class="px-3 py-3 text-right">Tokens</th>
+          <th class="px-4 py-3 text-left">Request ID</th>
+          <th class="px-4 py-3 text-left">Timestamp</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200">
+        <template x-for="r in aiRuns" :key="r.id">
+          <tr class="hover:bg-slate-50">
+            <td class="px-4 py-3 font-semibold text-slate-900" x-text="r.feature"></td>
+            <td class="px-3 py-3 text-slate-700 font-mono text-[11px]" x-text="`${r.provider} (${r.model})`"></td>
+            <td class="px-3 py-3 text-slate-500 font-mono text-[11px]" x-text="r.prompt_version"></td>
+            <td class="px-3 py-3 text-center">
+              <span class="px-2 py-0.5 rounded font-bold uppercase text-[10px]" :class="{
+                'bg-emerald-100 text-emerald-800': r.status === 'success',
+                'bg-amber-100 text-amber-800': r.status === 'retry',
+                'bg-blue-100 text-blue-800': r.status === 'fallback',
+                'bg-rose-100 text-rose-800': r.status === 'error'
+              }" x-text="r.status"></span>
+            </td>
+            <td class="px-3 py-3 text-right font-mono" x-text="`${r.latency_ms} ms`"></td>
+            <td class="px-3 py-3 text-right font-mono text-slate-500" x-text="r.prompt_tokens ? `${r.prompt_tokens} / ${r.completion_tokens}` : '-'"></td>
+            <td class="px-4 py-3 font-mono text-[10px] text-slate-400 truncate max-w-xs" :title="r.request_id" x-text="r.request_id"></td>
+            <td class="px-4 py-3 text-slate-400" x-text="new Date(r.created_at).toLocaleTimeString()"></td>
+          </tr>
+        </template>
+        <template x-if="aiRuns.length === 0">
+          <tr>
+            <td colspan="8" class="px-4 py-8 text-center text-slate-400">No AI runs recorded yet or admin token not entered.</td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Raw Logs Tab -->
+  <div x-show="tab === 'logs'" class="bg-slate-900 rounded-xl p-6 shadow-sm font-mono text-xs text-slate-300 overflow-x-auto h-[600px]">
+    <div class="space-y-1">
+      <template x-for="(line, idx) in logs" :key="idx">
+        <div class="hover:bg-slate-800/60 p-1 rounded" x-text="line"></div>
+      </template>
+      <template x-if="logs.length === 0">
+        <div class="text-slate-500 py-12 text-center">Log tail is empty or admin token not verified.</div>
+      </template>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function adminApp() {
+  return {
+    adminToken: 'change-admin-token',
+    tab: 'ai_runs',
+    aiRuns: [],
+    logs: [],
+
+    init() {
+      this.loadData();
+    },
+
+    async loadData() {
+      // Load AI Runs
+      try {
+        const res = await fetch(`/admin/ai-runs?token=${encodeURIComponent(this.adminToken)}`);
+        if (res.ok) {
+          this.aiRuns = await res.json();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      // Load Logs
+      try {
+        const res = await fetch(`/admin/logs?token=${encodeURIComponent(this.adminToken)}`);
+        if (res.ok) {
+          const data = await res.json();
+          this.logs = data.logs || [];
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}
+

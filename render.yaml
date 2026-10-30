@@ -1,0 +1,36 @@
+# Render.com deployment configuration
+# https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: contextkeeper
+    env: python
+    buildCommand: "pip install -r requirements.txt && alembic upgrade head"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    plan: free
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        value: sqlite:////var/data/contextkeeper.db
+      - key: LOG_FILE
+        value: /var/data/logs/app.log
+      - key: AUDIT_LOG_FILE
+        value: /var/data/logs/audit.log
+      - key: AI_PROVIDER
+        value: mock
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: SECRET_KEY
+        generateValue: true
+    disk:
+      name: contextkeeper-data
+      mountPath: /var/data
+      sizeGB: 1
+

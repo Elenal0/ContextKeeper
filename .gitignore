@@ -1,0 +1,39 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database & Logs
+*.db
+*.db-wal
+*.db-shm
+logs/*.log
+uploads/*
+!uploads/.gitkeep
+
+# Environment variables
+.env
+
+# Pytest / Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+

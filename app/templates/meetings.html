@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Meetings & Handovers — ContextKeeper{% endblock %}
+
+{% block content %}
+<div x-data="meetingsApp()">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight text-slate-900">Meetings & Work Handovers</h1>
+      <p class="text-sm text-slate-500 mt-1">Lifecycle tracking, full history, and carry-forward continuity across sprints.</p>
+    </div>
+    <button @click="showNewModal = true" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+      + New Session
+    </button>
+  </div>
+
+  <!-- Filters Row -->
+  <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap gap-4 items-center justify-between">
+    <div class="flex flex-wrap items-center gap-3">
+      <select x-model="filterType" @change="applyFilters()" class="text-xs rounded-lg border-slate-300 py-1.5 pl-3 pr-8 focus:ring-indigo-500">
+        <option value="">All Types</option>
+        <option value="meeting">Meeting</option>
+        <option value="handover">Work Handover</option>
+      </select>
+
+      <select x-model="filterStatus" @change="applyFilters()" class="text-xs rounded-lg border-slate-300 py-1.5 pl-3 pr-8 focus:ring-indigo-500">
+        <option value="">All Statuses</option>
+        <option value="draft">Draft</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="archived">Archived</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+
+    <div class="text-xs text-slate-500">
+      Total Sessions: <strong class="text-slate-800" x-text="meetings.length"></strong>
+    </div>
+  </div>
+
+  <!-- Meetings List -->
+  <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <table class="min-w-full divide-y divide-slate-200">
+      <thead class="bg-slate-50/75 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <tr>
+          <th scope="col" class="px-6 py-3.5 text-left">Session Title</th>
+          <th scope="col" class="px-4 py-3.5 text-left">Type</th>
+          <th scope="col" class="px-4 py-3.5 text-left">Status</th>
+          <th scope="col" class="px-4 py-3.5 text-left">Scheduled Time</th>
+          <th scope="col" class="px-4 py-3.5 text-center">Participants</th>
+          <th scope="col" class="px-4 py-3.5 text-center">Open Items</th>
+          <th scope="col" class="px-6 py-3.5 text-right">Action</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200 text-sm">
+        <template x-for="m in meetings" :key="m.id">
+          <tr class="hover:bg-slate-50/75 transition-colors">
+            <td class="px-6 py-4 font-medium text-slate-900">
+              <a :href="'/meetings/' + m.id" class="hover:text-indigo-600" x-text="m.title"></a>
+            </td>
+            <td class="px-4 py-4 text-xs">
+              <span :class="m.meeting_type === 'handover' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'" class="px-2 py-0.5 rounded font-medium capitalize" x-text="m.meeting_type"></span>
+            </td>
+            <td class="px-4 py-4 text-xs">
+              <span :class="{
+                'bg-slate-100 text-slate-700': m.status === 'draft',
+                'bg-indigo-100 text-indigo-700': m.status === 'scheduled',
+                'bg-amber-100 text-amber-700': m.status === 'in_progress',
+                'bg-emerald-100 text-emerald-700': m.status === 'completed',
+                'bg-slate-200 text-slate-600': m.status === 'archived',
+                'bg-rose-100 text-rose-700': m.status === 'cancelled'
+              }" class="px-2 py-0.5 rounded font-medium uppercase text-[10px]" x-text="m.status"></span>
+            </td>
+            <td class="px-4 py-4 text-xs text-slate-500" x-text="m.scheduled_at ? new Date(m.scheduled_at).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}) : 'TBD'"></td>
+            <td class="px-4 py-4 text-xs text-center font-semibold text-slate-700" x-text="m.participant_count"></td>
+            <td class="px-4 py-4 text-xs text-center font-semibold text-slate-700" x-text="m.open_item_count"></td>
+            <td class="px-6 py-4 text-right text-xs">
+              <a :href="'/meetings/' + m.id" class="text-indigo-600 hover:text-indigo-900 font-semibold">View Detail →</a>
+            </td>
+          </tr>
+        </template>
+        <template x-if="meetings.length === 0">
+          <tr>
+            <td colspan="7" class="px-6 py-8 text-center text-xs text-slate-500">
+              No meetings found matching your criteria. Click "+ New Session" to create one.
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Create Session Modal -->
+  <div x-cloak x-show="showNewModal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/50">
+    <div class="bg-white rounded-xl max-w-xl w-full p-6 shadow-2xl" @click.outside="showNewModal = false">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+        <h3 class="text-base font-bold text-slate-900">Schedule New Session or Handover</h3>
+        <button @click="showNewModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+      </div>
+
+      <form @submit.prevent="createSession()" class="mt-4 space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase">Title</label>
+          <input type="text" x-model="newSession.title" required placeholder="e.g. Sprint 24 Planning & Handover" class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase">Type</label>
+            <select x-model="newSession.meeting_type" class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500">
+              <option value="meeting">Team Meeting</option>
+              <option value="handover">Work Handover</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 uppercase">Scheduled Time</label>
+            <input type="datetime-local" x-model="newSession.scheduled_at" class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase">Initial Agenda</label>
+          <textarea x-model="newSession.agenda" rows="3" placeholder="- Item 1&#10;- Item 2" class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 uppercase">Raw Notes / Transcript (Optional)</label>
+          <textarea x-model="newSession.raw_notes" rows="3" placeholder="Paste notes, transcripts, or email thread here..." class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="pt-4 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" @click="showNewModal = false" class="px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-md">Cancel</button>
+          <button type="submit" class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">Create Session</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function meetingsApp() {
+  return {
+    meetings: {{ meetings_json | safe }},
+    filterType: '',
+    filterStatus: '',
+    showNewModal: new URLSearchParams(window.location.search).get('action') === 'new',
+    newSession: {
+      title: '',
+      meeting_type: 'meeting',
+      scheduled_at: '',
+      agenda: '',
+      raw_notes: '',
+      participant_ids: []
+    },
+
+    async applyFilters() {
+      let url = '/api/meetings?';
+      if (this.filterType) url += `type=${this.filterType}&`;
+      if (this.filterStatus) url += `status=${this.filterStatus}&`;
+      const res = await fetch(url);
+      if (res.ok) {
+        this.meetings = await res.json();
+      }
+    },
+
+    async createSession() {
+      try {
+        const payload = {
+          title: this.newSession.title,
+          meeting_type: this.newSession.meeting_type,
+          scheduled_at: this.newSession.scheduled_at ? new Date(this.newSession.scheduled_at).toISOString() : null,
+          agenda: this.newSession.agenda,
+          raw_notes: this.newSession.raw_notes,
+          participant_ids: []
+        };
+        const res = await fetch('/api/meetings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const created = await res.json();
+          window.location.href = `/meetings/${created.id}`;
+        } else {
+          const err = await res.json();
+          alert('Error: ' + JSON.stringify(err));
+        }
+      } catch (e) {
+        alert('Network error: ' + e);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}
+
