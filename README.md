@@ -20,8 +20,9 @@
 7. [API Overview](#7-api-overview)
 8. [Testing Suite](#8-testing-suite)
 9. [Deployment Guide](#9-deployment-guide)
-10. [Design Decisions, Trade-Offs & Viva Defense](#10-design-decisions-trade-offs--viva-defense)
-11. [Assessment Criteria Mapping Checklist](#11-assessment-criteria-mapping-checklist)
+10. [Deployment (Fly.io)](#10-deployment-flyio)
+11. [Design Decisions, Trade-Offs & Viva Defense](#11-design-decisions-trade-offs--viva-defense)
+12. [Assessment Criteria Mapping Checklist](#12-assessment-criteria-mapping-checklist)
 
 ---
 
@@ -301,7 +302,140 @@ docker-compose up --build
 
 ---
 
-## 10. Design Decisions, Trade-Offs & Viva Defense
+## 10. Deployment (Fly.io)
+
+ContextKeeper ships with a production-grade Fly.io configuration using a **persistent volume** for SQLite, logs, and file uploads.
+
+**Live URL:** `https://contextkeeper-app.fly.dev` *(update after `fly launch`)*
+
+> **Why one machine + one worker?**
+> SQLite is a single-writer database on a single volume. Multiple Fly machines or multiple uvicorn workers would all try to write to the same file over the network, causing `SQLITE_BUSY` errors. One machine + `--workers 1` avoids all concurrency issues. To scale beyond one instance, migrate `DATABASE_URL` to a Fly Postgres cluster.
+
+---
+
+### Prerequisites
+- [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) installed and authenticated
+- Docker installed (for local validation — optional)
+
+---
+
+### Step-by-step deployment
+
+```bash
+# 1. Authenticate with Fly.io
+fly auth login
+
+# 2. Create the app from the existing fly.toml (no deploy yet)
+fly launch --no-deploy
+
+# 3. Create the 1 GB persistent volume in Mumbai (bom)
+#    This is where SQLite, logs, and uploads live.
+fly volumes create data --region bom --size 1
+
+# 4. Set secrets (never go in fly.toml or version control)
+fly secrets set \
+  ADMIN_TOKEN=$(openssl rand -hex 32) \
+  GEMINI_API_KEY=<your-key>     # or ANTHROPIC_API_KEY / OPENAI_API_KEY
+
+# Also update AI_PROVIDER in fly.toml [env] to "gemini" (or your provider), then:
+
+# 5. Deploy
+fly deploy
+
+# 6. Seed with realistic demo data (one-time, runs inside the container with the volume)
+fly ssh console -C "python -m app.seed"
+
+# 7. Verify the app is alive
+curl https://contextkeeper-app.fly.dev/healthz
+```
+
+---
+
+### Environment Variable Reference
+
+| Variable | Where to set | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `APP_ENV` | `fly.toml [env]` | `production` | Must be `production` in deployment |
+| `DATABASE_URL` | `fly.toml [env]` | `sqlite:////data/contextkeeper.db` | Full path on the volume |
+| `LOG_DIR` | `fly.toml [env]` | `/data/logs` | Log directory on the volume |
+| `UPLOAD_DIR` | `fly.toml [env]` | `/data/uploads` | Upload directory on the volume |
+| `LOG_LEVEL` | `fly.toml [env]` | `INFO` | `DEBUG` / `INFO` / `WARNING` |
+| `AI_PROVIDER` | `fly.toml [env]` | `mock` | `mock` / `gemini` / `anthropic` / `openai` |
+| `ADMIN_TOKEN` | **`fly secrets set`** | *(required)* | Protects `/admin/*` endpoints |
+| `GEMINI_API_KEY` | **`fly secrets set`** | *(optional)* | Required if `AI_PROVIDER=gemini` |
+| `ANTHROPIC_API_KEY` | **`fly secrets set`** | *(optional)* | Required if `AI_PROVIDER=anthropic` |
+| `OPENAI_API_KEY` | **`fly secrets set`** | *(optional)* | Required if `AI_PROVIDER=openai` |
+
+---
+
+### Observability
+
+```bash
+# Tail live logs
+fly logs
+
+# Find all log lines for a single request (replace with your request_id)
+fly logs | grep "d9e2a14f-8012-4cf4-91b6-791e3e0fa411"
+
+# SSH into the running machine
+fly ssh console
+
+# Download the SQLite database for a local backup
+fly ssh sftp get /data/contextkeeper.db ./contextkeeper-backup.db
+```
+
+---
+
+### Rolling back
+
+```bash
+# List recent releases
+fly releases
+
+# Redeploy a specific image
+fly deploy --image registry.fly.io/contextkeeper-app:<version>
+```
+
+---
+
+### Local Docker validation
+
+```bash
+# Build the production image
+docker build -t contextkeeper .
+
+# Run it with a named volume (simulates the Fly.io persistent volume)
+docker run -p 8080:8080 \
+  -v ck_data:/data \
+  --env-file .env \
+  contextkeeper
+
+# Verify health
+curl http://localhost:8080/healthz
+
+# Seed demo data
+docker exec <container_id> python -m app.seed
+
+# Stop + restart — data survives because it's on the volume
+docker stop <container_id>
+docker run -p 8080:8080 -v ck_data:/data --env-file .env contextkeeper
+# Your previously created item is still there ✓
+```
+
+---
+
+### SQLite scalability limitation
+
+SQLite on a single Fly volume **does not scale horizontally**. If you need:
+- **High write throughput** → migrate to [Fly Postgres](https://fly.io/docs/postgres/) by updating `DATABASE_URL`
+- **Multiple regions** → use [LiteFS](https://fly.io/docs/litefs/) (distributed SQLite) or Fly Postgres with replicas
+- **Zero-downtime deploys with schema changes** → Alembic runs migrations at startup inside the same machine that holds the volume
+
+The schema and app code are fully SQLAlchemy-portable: changing `DATABASE_URL` to a Postgres connection string is the only required step.
+
+---
+
+## 11. Design Decisions, Trade-Offs & Viva Defense
 
 1. **Why SQLite WAL Mode over a separate PostgreSQL container for local dev?**
    - *Decision*: Enforce WAL mode (`PRAGMA journal_mode=WAL`) and foreign keys on SQLite.
@@ -318,7 +452,7 @@ docker-compose up --build
 
 ---
 
-## 11. Assessment Criteria Mapping Checklist
+## 12. Assessment Criteria Mapping Checklist
 
 | Assessment Criterion | Requirement | Where Satisfied in Code |
 | :--- | :--- | :--- |

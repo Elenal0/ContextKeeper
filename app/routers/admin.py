@@ -1,4 +1,4 @@
-"""Admin router — view recent application logs and AI runs (protected by ADMIN_TOKEN)."""
+"""Admin router — view recent application logs, AI runs, and seed (protected by ADMIN_TOKEN)."""
 from __future__ import annotations
 
 import os
@@ -37,7 +37,7 @@ def get_recent_logs(
     try:
         with open(log_path, "r", encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
-        recent = [l.strip() for l in lines[-limit:] if l.strip()]
+        recent = [line.strip() for line in lines[-limit:] if line.strip()]
         return {
             "total_lines_returned": len(recent),
             "file": str(log_path),
@@ -61,3 +61,17 @@ def get_ai_runs(
         .all()
     )
 
+
+@router.post("/seed", status_code=200)
+def trigger_seed(_: bool = Depends(verify_admin)):
+    """
+    Idempotently seed the database with realistic demo data.
+    Safe to call multiple times — will clear and re-seed if data already exists.
+    Protected by X-Admin-Token header.
+    """
+    try:
+        from app.seed import seed
+        seed()
+        return {"status": "ok", "message": "Database seeded successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Seed failed: {e}")

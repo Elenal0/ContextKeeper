@@ -1,0 +1,48 @@
+# fly.toml — ContextKeeper Fly.io deployment configuration
+# Replace "contextkeeper-app" with your own unique app name (fly launch will set it).
+
+app = "contextkeeper-app"
+primary_region = "bom"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# ── Persistent SQLite volume ──────────────────────────────────────────────────
+# Create with: fly volumes create data --region bom --size 1
+[[mounts]]
+  source = "data"
+  destination = "/data"
+
+# ── HTTP service ──────────────────────────────────────────────────────────────
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # Health check — /healthz is a cheap DB ping (no AI calls)
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "15s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+# ── VM size ───────────────────────────────────────────────────────────────────
+# Raise to performance-shared-cpu-1x / 1gb if the app OOMs on 512 MB
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+# ── Non-secret environment variables ─────────────────────────────────────────
+# Secrets (ADMIN_TOKEN, *_API_KEY) are set via:  fly secrets set KEY=value
+[env]
+  APP_ENV = "production"
+  LOG_LEVEL = "INFO"
+  DATABASE_URL = "sqlite:////data/contextkeeper.db"
+  LOG_DIR = "/data/logs"
+  UPLOAD_DIR = "/data/uploads"
+  AI_PROVIDER = "mock"      # change to "gemini" / "anthropic" / "openai" after setting the key
+

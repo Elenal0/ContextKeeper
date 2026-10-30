@@ -6,6 +6,7 @@ AI-Powered Knowledge & Task Management Platform with Handover Risk Radar.
 from __future__ import annotations
 
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -35,9 +36,53 @@ from app.schemas.common import ErrorDetail, ErrorEnvelope, ErrorResponse
 logger = get_logger("app.main")
 
 
+def _ensure_data_dirs() -> None:
+    """Create LOG_DIR and UPLOAD_DIR on the volume if they don't exist."""
+    for dir_path in (settings.LOG_DIR, settings.UPLOAD_DIR):
+        try:
+            Path(dir_path).mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            # Don't crash — fall back gracefully; logging will use stdout
+            print(f"[WARN] Could not create directory {dir_path}: {e}")
+
+
+def _check_fts5() -> bool:
+    """Return True if the SQLite build supports FTS5."""
+    try:
+        conn = sqlite3.connect(":memory:")
+        conn.execute("CREATE VIRTUAL TABLE _fts5_probe USING fts5(x)")
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def _run_migrations() -> None:
+    """Run Alembic migrations idempotently at startup."""
+    try:
+        from alembic import command
+        from alembic.config import Config as AlembicConfig
+
+        alembic_cfg = AlembicConfig("alembic.ini")
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+        command.upgrade(alembic_cfg, "head")
+        logger.info("alembic_migrations_applied")
+    except Exception as exc:
+        # If alembic fails (e.g. first boot, alembic not configured),
+        # fall back to create_all so the app still starts.
+        logger.warning("alembic_migration_failed_falling_back_to_create_all", error=str(exc))
+        Base.metadata.create_all(bind=engine)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize structured logging
+    # ── 0. Production secrets guard ───────────────────────────────────────────
+    settings.validate_production_secrets()
+
+    # ── 1. Ensure persistent volume directories exist ─────────────────────────
+    _ensure_data_dirs()
+
+    # ── 2. Initialize structured logging ─────────────────────────────────────
     configure_logging(
         log_level=settings.LOG_LEVEL,
         log_file=settings.LOG_FILE,
@@ -47,10 +92,19 @@ async def lifespan(app: FastAPI):
     )
     logger.info("app_starting", app_name=settings.APP_NAME, env=settings.APP_ENV)
 
-    # Create tables automatically if SQLite
-    Base.metadata.create_all(bind=engine)
-    logger.info("database_tables_initialized")
+    # ── 3. FTS5 availability check ────────────────────────────────────────────
+    if _check_fts5():
+        logger.info("fts5_available")
+    else:
+        logger.warning(
+            "fts5_unavailable",
+            fallback="LIKE-based search active — FTS5 not compiled into this SQLite build",
+        )
 
+    # ── 4. Run Alembic migrations (idempotent, non-destructive) ──────────────
+    _run_migrations()
+
+    logger.info("app_ready", ai_provider=settings.effective_ai_provider())
     yield
 
     logger.info("app_stopping")
@@ -133,18 +187,21 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.get("/healthz", tags=["system"])
 def health_check():
-    """Liveness probe: verifies application process and database connectivity."""
-    db_status = "ok"
+    """Liveness probe: checks DB connectivity only. No AI calls, stays cheap."""
+    db_ok = True
+    db_detail = "ok"
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception as e:
-        db_status = f"unhealthy: {e}"
+        db_ok = False
+        db_detail = f"unhealthy: {e}"
 
     return {
-        "status": "ok" if db_status == "ok" else "degraded",
+        "status": "ok" if db_ok else "degraded",
         "app": settings.APP_NAME,
-        "database": db_status,
+        "version": "1.0.0",
+        "database": db_detail,
         "ai_provider": settings.effective_ai_provider(),
     }
 
@@ -161,4 +218,3 @@ app.include_router(kb.router)
 app.include_router(ai_router.router)
 app.include_router(risk_router.router)
 app.include_router(admin.router)
-

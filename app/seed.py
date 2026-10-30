@@ -36,17 +36,24 @@ from app.db.session import engine, SessionLocal
 
 
 def seed():
+    """
+    Seed the database with realistic demo data.
+    Idempotent: safe to call multiple times. Clears and re-seeds when data exists.
+    """
     print("[*] Initializing ContextKeeper seed...")
+    # Ensure tables exist (idempotent — won't overwrite schema)
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
     try:
         # Check if already seeded
         if db.query(Person).count() > 0:
-            print("Database already contains data. Clearing existing records for clean re-seed...")
+            print("[*] Existing data found — clearing for clean re-seed...")
             for table in reversed(Base.metadata.sorted_tables):
                 db.execute(table.delete())
             db.commit()
+        else:
+            print("[*] Empty database — seeding fresh data...")
 
         now = datetime.now(timezone.utc)
 

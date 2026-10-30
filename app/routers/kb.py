@@ -131,9 +131,9 @@ async def upload_document(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Failed to extract text from DOCX: {e}")
 
-    # Save to disk
-    os.makedirs("uploads", exist_ok=True)
-    save_path = os.path.join("uploads", filename)
+    # Save to disk (use UPLOAD_DIR from settings so it lands on the volume)
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    save_path = os.path.join(settings.UPLOAD_DIR, filename)
     with open(save_path, "wb") as f:
         f.write(contents)
 

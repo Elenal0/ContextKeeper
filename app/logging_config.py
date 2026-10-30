@@ -60,11 +60,12 @@ def _add_request_id(
 
 def configure_logging(log_level: str, log_file: str, audit_log_file: str,
                       max_bytes: int, backup_count: int) -> None:
-    """Set up structlog + stdlib handlers."""
-    # Ensure log directories exist
-    for path in (log_file, audit_log_file):
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+    """
+    Set up structlog + stdlib handlers.
 
+    If the log directory is not writable (e.g. volume not mounted yet), we log
+    a clear warning and fall back to stdout-only — the app keeps running.
+    """
     level = getattr(logging, log_level.upper(), logging.INFO)
 
     # ── Stdlib root logger ────────────────────────────────────────────────────
@@ -73,26 +74,37 @@ def configure_logging(log_level: str, log_file: str, audit_log_file: str,
 
     formatter = logging.Formatter("%(message)s")  # structlog renders JSON
 
-    # stdout
+    # stdout — always present
     stream_handler = logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     root_logger.addHandler(stream_handler)
 
-    # rotating app log
-    file_handler = logging.handlers.RotatingFileHandler(
-        log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
-    root_logger.addHandler(file_handler)
+    # rotating app log — skipped gracefully if not writable
+    def _try_add_file_handler(path: str, target_logger: logging.Logger) -> bool:
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            fh = logging.handlers.RotatingFileHandler(
+                path, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
+            )
+            fh.setFormatter(formatter)
+            target_logger.addHandler(fh)
+            return True
+        except OSError as exc:
+            print(
+                f"[WARN] Cannot write log file {path}: {exc}. "
+                "Falling back to stdout-only logging.",
+                flush=True,
+            )
+            return False
+
+    _try_add_file_handler(log_file, root_logger)
 
     # ── Audit logger ──────────────────────────────────────────────────────────
     audit_logger = logging.getLogger("audit")
     audit_logger.propagate = False
-    audit_handler = logging.handlers.RotatingFileHandler(
-        audit_log_file, maxBytes=max_bytes, backupCount=backup_count, encoding="utf-8"
-    )
-    audit_handler.setFormatter(formatter)
-    audit_logger.addHandler(audit_handler)
+    if not _try_add_file_handler(audit_log_file, audit_logger):
+        # Ensure audit events still flow to stdout via root logger propagation
+        audit_logger.propagate = True
 
     # ── structlog configuration ───────────────────────────────────────────────
     structlog.configure(

@@ -4,6 +4,8 @@ Never put secrets in code; use .env (gitignored) or deployment env vars.
 """
 from __future__ import annotations
 
+import sys
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
@@ -26,12 +28,22 @@ class Settings(BaseSettings):
     # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str = "sqlite:///./contextkeeper.db"
 
+    # ── Paths (override to point at the mounted volume in production) ─────────
+    LOG_DIR: str = "logs"
+    UPLOAD_DIR: str = "uploads"
+
     # ── Logging ──────────────────────────────────────────────────────────────
     LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    LOG_FILE: str = "logs/app.log"
-    AUDIT_LOG_FILE: str = "logs/audit.log"
     LOG_MAX_BYTES: int = 5 * 1024 * 1024  # 5 MB
     LOG_BACKUP_COUNT: int = 5
+
+    @property
+    def LOG_FILE(self) -> str:
+        return str(Path(self.LOG_DIR) / "app.log")
+
+    @property
+    def AUDIT_LOG_FILE(self) -> str:
+        return str(Path(self.LOG_DIR) / "audit.log")
 
     # ── AI Provider ──────────────────────────────────────────────────────────
     AI_PROVIDER: Literal["gemini", "anthropic", "openai", "mock"] = "mock"
@@ -82,6 +94,19 @@ class Settings(BaseSettings):
             return "openai"
         return "mock"
 
+    def validate_production_secrets(self) -> None:
+        """Fail loudly if production is running with default dev credentials."""
+        if self.APP_ENV != "production":
+            return
+        _DEV_TOKEN = "change-admin-token"
+        if not self.ADMIN_TOKEN or self.ADMIN_TOKEN == _DEV_TOKEN:
+            # Print without the actual token value to avoid leaking it
+            print(
+                "FATAL: ADMIN_TOKEN is unset or still set to the dev default. "
+                "Set a strong ADMIN_TOKEN secret before running in production.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
 
 settings = Settings()
-
