@@ -1,117 +1,320 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full bg-slate-50 text-slate-900">
+<html lang="en" class="h-full bg-[#F4F6F8]">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}ContextKeeper — AI-Powered Knowledge & Task Management{% endblock %}</title>
+  <title>{% block title %}ContextKeeper — Knowledge & Task Platform{% endblock %}</title>
+
+  <!-- Google Fonts: Sora (Headings) & Inter (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
   <!-- Alpine.js CDN -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            display: ['Sora', 'Inter', 'sans-serif'],
+          },
           colors: {
             brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              500: '#22c55e',
-              600: '#16a34a',
-              700: '#15803d',
-            }
+              DEFAULT: '#283048',
+              soft: '#859398',
+            },
+            ink: {
+              DEFAULT: '#1B2233',
+              muted: '#5B6575',
+            },
+            danger: '#D64545',
+            warn: '#E0A030',
+            ok: '#2E9E6B',
+            info: '#4A6FA5',
           }
         }
       }
     }
   </script>
+
   <style>
+    :root {
+      --grad: linear-gradient(135deg, #283048 0%, #859398 100%);
+      --bg: #F4F6F8;
+      --surface: #FFFFFF;
+      --ink: #1B2233;
+      --ink-muted: #5B6575;
+      --brand: #283048;
+      --brand-soft: #859398;
+      --border: #E3E7EC;
+      --danger: #D64545;
+      --warn: #E0A030;
+      --ok: #2E9E6B;
+      --info: #4A6FA5;
+    }
+
     [x-cloak] { display: none !important; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    h1, h2, h3, .font-heading {
+      font-family: 'Sora', sans-serif;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-gradient {
+      background: var(--grad);
+    }
+
+    /* Motion Curve */
+    .ease-spring {
+      transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    /* Smooth Page Entrance */
+    .animate-enter {
+      animation: enterFade 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+
+    @keyframes enterFade {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Shimmer effect for AI loading states */
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    .skeleton-shimmer {
+      background: linear-gradient(90deg, #F0F2F5 25%, #E4E7EC 50%, #F0F2F5 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+
+    /* Respect reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
-<body class="h-full flex flex-col font-sans" x-data="{ activeTab: 'dashboard', toast: { show: false, message: '', type: 'info' } }">
+<body class="h-full flex flex-col font-sans" x-data="{ mobileNav: false, userMenu: false, toast: { show: false, message: '', type: 'info' } }">
 
-  <!-- Top Navigation Bar -->
-  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+  <!-- Sticky Modern Header with Brand Gradient -->
+  <header class="brand-gradient text-white sticky top-0 z-40 shadow-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16 items-center">
-        <!-- Logo & Branding -->
-        <div class="flex items-center space-x-3">
-          <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            CK
-          </div>
-          <div>
-            <a href="/" class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+      <div class="flex items-center justify-between h-16 gap-4">
+        
+        <!-- Left: Logo & Wordmark (Sora font) -->
+        <div class="flex items-center space-x-3 flex-shrink-0">
+          <a href="/" class="flex items-center gap-2.5 group">
+            <div class="w-9 h-9 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-white font-heading font-bold text-base shadow-sm group-hover:bg-white/20 transition-all duration-200">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+            </div>
+            <span class="font-heading font-bold text-lg tracking-tight text-white group-hover:text-slate-100 transition-colors">
               ContextKeeper
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v1.0</span>
-            </a>
-          </div>
+            </span>
+          </a>
         </div>
 
-        <!-- Navigation Tabs -->
-        <nav class="hidden md:flex space-x-1">
-          <a href="/" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'dashboard' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            🎯 Risk Radar
+        <!-- Centre: Nav Segmented Pills (Single word, No wrap, Lucide Icons) -->
+        <nav class="hidden md:flex items-center p-1 bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-inner">
+          <!-- Radar -->
+          <a href="/" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-spring {% if active_page == 'dashboard' %}bg-white text-[#1B2233] font-semibold shadow-sm{% else %}text-slate-200 hover:text-white hover:bg-white/10{% endif %}">
+            <svg class="w-4 h-4 {% if active_page == 'dashboard' %}text-[#283048]{% else %}text-slate-300{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9"/>
+              <circle cx="12" cy="12" r="3"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3"/>
+            </svg>
+            <span>Radar</span>
           </a>
-          <a href="/meetings" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'meetings' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            📅 Meetings & Handovers
+
+          <!-- Meetings -->
+          <a href="/meetings" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-spring {% if active_page == 'meetings' %}bg-white text-[#1B2233] font-semibold shadow-sm{% else %}text-slate-200 hover:text-white hover:bg-white/10{% endif %}">
+            <svg class="w-4 h-4 {% if active_page == 'meetings' %}text-[#283048]{% else %}text-slate-300{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span>Meetings</span>
           </a>
-          <a href="/items" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'items' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            ✅ Action Items
+
+          <!-- Actions -->
+          <a href="/items" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-spring {% if active_page == 'items' %}bg-white text-[#1B2233] font-semibold shadow-sm{% else %}text-slate-200 hover:text-white hover:bg-white/10{% endif %}">
+            <svg class="w-4 h-4 {% if active_page == 'items' %}text-[#283048]{% else %}text-slate-300{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 11l3 3L22 4"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            <span>Actions</span>
           </a>
-          <a href="/catchup" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'catchup' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            ⚡ Catch-Up Brief
+
+          <!-- Briefs -->
+          <a href="/catchup" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-spring {% if active_page == 'catchup' %}bg-white text-[#1B2233] font-semibold shadow-sm{% else %}text-slate-200 hover:text-white hover:bg-white/10{% endif %}">
+            <svg class="w-4 h-4 {% if active_page == 'catchup' %}text-[#283048]{% else %}text-slate-300{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            <span>Briefs</span>
           </a>
-          <a href="/kb" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'kb' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            📚 Knowledge Base
-          </a>
-          <a href="/admin-ui" class="px-3 py-2 rounded-md text-sm font-medium {% if active_page == 'admin' %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-100{% endif %}">
-            ⚙️ Admin & Logs
+
+          <!-- Knowledge -->
+          <a href="/kb" class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all duration-200 ease-spring {% if active_page == 'kb' %}bg-white text-[#1B2233] font-semibold shadow-sm{% else %}text-slate-200 hover:text-white hover:bg-white/10{% endif %}">
+            <svg class="w-4 h-4 {% if active_page == 'kb' %}text-[#283048]{% else %}text-slate-300{% endif %}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+            </svg>
+            <span>Knowledge</span>
           </a>
         </nav>
 
-        <!-- Right Side info -->
+        <!-- Right: AI Indicator Dot + Compact Overflow Menu -->
         <div class="flex items-center space-x-3">
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            AI: {{ ai_provider | upper }}
-          </span>
-          <a href="/docs" target="_blank" class="text-xs text-slate-500 hover:text-slate-800 underline">API Docs</a>
+          <!-- AI Dot -->
+          <div class="relative group cursor-pointer flex items-center gap-2 px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-white/90 transition-colors">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="font-medium text-[11px] uppercase tracking-wider">{{ ai_provider }}</span>
+            <div class="absolute right-0 top-full mt-2 hidden group-hover:block z-50 bg-[#1B2233] text-white text-[11px] px-2.5 py-1 rounded shadow-lg whitespace-nowrap border border-white/10">
+              Provider: {{ ai_provider | upper }} Mode
+            </div>
+          </div>
+
+          <!-- Overflow Menu (Admin & Docs) -->
+          <div class="relative" @click.outside="userMenu = false">
+            <button @click="userMenu = !userMenu" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/40">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="1"/>
+                <circle cx="12" cy="5" r="1"/>
+                <circle cx="12" cy="19" r="1"/>
+              </svg>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div x-cloak x-show="userMenu" 
+                 x-transition:enter="transition ease-out duration-150"
+                 x-transition:enter-start="opacity-0 scale-95"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 x-transition:leave="transition ease-in duration-100"
+                 x-transition:leave-start="opacity-100 scale-100"
+                 x-transition:leave-end="opacity-0 scale-95"
+                 class="absolute right-0 mt-2 w-48 rounded-xl bg-white text-[#1B2233] shadow-xl border border-slate-200 py-1.5 z-50 text-xs font-medium">
+              <a href="/admin-ui" class="flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-100 transition-colors">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>Admin & Logs</span>
+              </a>
+              <a href="/docs" target="_blank" class="flex items-center gap-2.5 px-3.5 py-2 hover:bg-slate-100 transition-colors">
+                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Interactive API Docs</span>
+              </a>
+              <div class="border-t border-slate-100 my-1"></div>
+              <a href="/healthz" target="_blank" class="flex items-center gap-2.5 px-3.5 py-2 text-slate-500 hover:bg-slate-100 transition-colors">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                <span>System Healthz</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Mobile Hamburger Toggle -->
+          <button @click="mobileNav = !mobileNav" class="md:hidden p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
         </div>
       </div>
+    </div>
+
+    <!-- Mobile Drawer Navigation -->
+    <div x-cloak x-show="mobileNav" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 -translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 -translate-y-2"
+         class="md:hidden border-t border-white/10 bg-[#283048] px-4 pt-2 pb-4 space-y-1 text-sm font-medium">
+      <a href="/" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">🎯 Radar</a>
+      <a href="/meetings" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">📅 Meetings</a>
+      <a href="/items" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">✅ Actions</a>
+      <a href="/catchup" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">⚡ Briefs</a>
+      <a href="/kb" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">📚 Knowledge</a>
+      <a href="/admin-ui" class="block px-3 py-2 rounded-lg text-white hover:bg-white/10">⚙️ Admin & Logs</a>
     </div>
   </header>
 
   <!-- Notification Toast -->
   <div x-cloak x-show="toast.show" 
        x-transition:enter="transition ease-out duration-300"
-       x-transition:enter-start="opacity-0 transform translate-y-2"
-       x-transition:enter-end="opacity-100 transform translate-y-0"
+       x-transition:enter-start="opacity-0 translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
        x-transition:leave="transition ease-in duration-200"
-       x-transition:leave-start="opacity-100 transform translate-y-0"
-       x-transition:leave-end="opacity-0 transform translate-y-2"
-       class="fixed bottom-5 right-5 z-50 max-w-sm bg-white border border-slate-200 rounded-lg shadow-xl p-4 flex items-start space-x-3">
-    <div x-text="toast.type === 'error' ? '❌' : (toast.type === 'warning' ? '⚠️' : '✅')"></div>
-    <div class="flex-1">
-      <p class="text-sm font-medium text-slate-900" x-text="toast.message"></p>
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 translate-y-2"
+       class="fixed bottom-5 right-5 z-50 max-w-sm bg-white border border-slate-200 rounded-xl shadow-2xl p-4 flex items-start space-x-3">
+    <div class="flex-shrink-0 mt-0.5">
+      <template x-if="toast.type === 'error'">
+        <span class="w-5 h-5 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs font-bold">✕</span>
+      </template>
+      <template x-if="toast.type !== 'error'">
+        <span class="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-xs font-bold">✓</span>
+      </template>
     </div>
-    <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+    <div class="flex-1 min-w-0">
+      <p class="text-xs font-medium text-slate-900" x-text="toast.message"></p>
+    </div>
+    <button @click="toast.show = false" class="text-slate-400 hover:text-slate-600 text-xs">✕</button>
   </div>
 
-  <!-- Main Content Container -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Main Content Container with Smooth Animation -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-enter">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- Footer -->
+  <!-- Clean Footer with App Version -->
   <footer class="bg-white border-t border-slate-200 mt-auto">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center text-xs text-slate-500">
-      <div>ContextKeeper • Automated context transfer, follow-up & risk radar</div>
-      <div>Zero context loss across meetings and leaves</div>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center text-xs text-[#5B6575] gap-2">
+      <div class="flex items-center gap-2">
+        <span class="font-heading font-semibold text-[#1B2233]">ContextKeeper</span>
+        <span>•</span>
+        <span>Zero context loss across meetings and leaves</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-mono">v1.0.0</span>
+        <a href="/docs" target="_blank" class="hover:text-slate-900 underline">API Specs</a>
+        <a href="/healthz" target="_blank" class="hover:text-slate-900 underline">Status</a>
+      </div>
     </div>
   </footer>
 
   {% block scripts %}{% endblock %}
 </body>
 </html>
-

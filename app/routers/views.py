@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -18,6 +20,123 @@ router = APIRouter(tags=["views"])
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+
+# ── Humanizing Jinja Filters ──────────────────────────────────────────────────
+
+def human_status(val: Any) -> str:
+    if not val:
+        return "Unknown"
+    s = getattr(val, "value", str(val))
+    if "." in s:
+        s = s.split(".")[-1]
+    mapping = {
+        "draft": "Draft",
+        "scheduled": "Scheduled",
+        "in_progress": "In Progress",
+        "completed": "Completed",
+        "archived": "Archived",
+        "cancelled": "Cancelled",
+        "open": "Open",
+        "blocked": "Blocked",
+        "done": "Done",
+    }
+    return mapping.get(s.lower(), s.replace("_", " ").title())
+
+
+def human_type(val: Any) -> str:
+    if not val:
+        return "Meeting"
+    s = getattr(val, "value", str(val))
+    if "." in s:
+        s = s.split(".")[-1]
+    mapping = {"meeting": "Meeting", "handover": "Work Handover"}
+    return mapping.get(s.lower(), s.replace("_", " ").title())
+
+
+def human_rsvp(val: Any) -> str:
+    if not val:
+        return "Invited"
+    s = getattr(val, "value", str(val))
+    if "." in s:
+        s = s.split(".")[-1]
+    mapping = {
+        "invited": "Invited",
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "no_response": "No Response",
+        "attended": "Attended",
+        "absent": "Absent",
+    }
+    return mapping.get(s.lower(), s.replace("_", " ").title())
+
+
+def human_priority(val: Any) -> str:
+    if not val:
+        return "Medium"
+    s = getattr(val, "value", str(val))
+    if "." in s:
+        s = s.split(".")[-1]
+    return s.capitalize()
+
+
+def human_date(val: Any) -> str:
+    if not val:
+        return "TBD"
+    if isinstance(val, str):
+        try:
+            val = datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except Exception:
+            return val
+    return val.strftime("%b %d, %Y, %I:%M %p")
+
+
+def time_ago_or_left(val: Any) -> str:
+    if not val:
+        return ""
+    if isinstance(val, str):
+        try:
+            val = datetime.fromisoformat(val.replace("Z", "+00:00"))
+        except Exception:
+            return ""
+    now = datetime.now(val.tzinfo or timezone.utc)
+    if val.tzinfo is None:
+        val = val.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+    diff = (val - now).total_seconds()
+    days = int(diff / 86400)
+    if days > 1:
+        return f"in {days} days"
+    elif days == 1:
+        return "tomorrow"
+    elif days == 0 and diff > 0:
+        return "today"
+    elif days == 0 and diff <= 0:
+        return "earlier today"
+    elif days == -1:
+        return "yesterday"
+    else:
+        return f"{abs(days)} days ago"
+
+
+def format_initials(name: str) -> str:
+    if not name:
+        return "??"
+    parts = name.strip().split()
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[-1][0]).upper()
+    return name[:2].upper()
+
+
+templates.env.filters["human_status"] = human_status
+templates.env.filters["human_type"] = human_type
+templates.env.filters["human_rsvp"] = human_rsvp
+templates.env.filters["human_priority"] = human_priority
+templates.env.filters["human_date"] = human_date
+templates.env.filters["time_ago_or_left"] = time_ago_or_left
+templates.env.filters["initials"] = format_initials
+
+
+# ── View Endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
 def view_dashboard(request: Request, db: Session = Depends(get_db)):
@@ -67,8 +186,10 @@ def view_meetings(request: Request, db: Session = Depends(get_db)):
         meetings_data.append({
             "id": m.id,
             "title": m.title,
-            "meeting_type": m.meeting_type,
-            "status": m.status,
+            "meeting_type": human_type(m.meeting_type),
+            "raw_type": getattr(m.meeting_type, "value", str(m.meeting_type)),
+            "status": human_status(m.status),
+            "raw_status": getattr(m.status, "value", str(m.status)),
             "scheduled_at": m.scheduled_at.isoformat() if m.scheduled_at else None,
             "participant_count": len(m.participants),
             "open_item_count": open_items,
@@ -99,8 +220,10 @@ def view_meeting_detail(meeting_id: int, request: Request, db: Session = Depends
             "id": i.id,
             "title": i.title,
             "owner_name": owner.name if owner else "Unassigned",
-            "status": i.status,
-            "priority": i.priority,
+            "owner_initials": format_initials(owner.name if owner else "Unassigned"),
+            "status": human_status(i.status),
+            "raw_status": getattr(i.status, "value", str(i.status)),
+            "priority": human_priority(i.priority),
             "due_date": i.due_date.isoformat() if i.due_date else None,
             "carry_forward_count": i.carry_forward_count,
             "ai_generated": i.ai_generated,
@@ -113,8 +236,10 @@ def view_meeting_detail(meeting_id: int, request: Request, db: Session = Depends
             "id": p.id,
             "person_id": p.person_id,
             "person_name": person.name if person else "Unknown",
+            "person_initials": format_initials(person.name if person else "Unknown"),
             "person_email": person.email if person else "",
-            "rsvp": p.rsvp,
+            "rsvp": human_rsvp(p.rsvp),
+            "raw_rsvp": getattr(p.rsvp, "value", str(p.rsvp)),
         })
 
     kb_links = db.query(KBLink).filter(KBLink.meeting_id == meeting.id).all()
@@ -155,8 +280,10 @@ def view_items(request: Request, db: Session = Depends(get_db)):
             "title": i.title,
             "owner_id": i.owner_id,
             "owner_name": owner.name if owner else "Unassigned",
-            "status": i.status,
-            "priority": i.priority,
+            "owner_initials": format_initials(owner.name if owner else "Unassigned"),
+            "status": human_status(i.status),
+            "raw_status": getattr(i.status, "value", str(i.status)),
+            "priority": human_priority(i.priority),
             "due_date": i.due_date.isoformat() if i.due_date else None,
             "carry_forward_count": i.carry_forward_count,
             "ai_generated": i.ai_generated,

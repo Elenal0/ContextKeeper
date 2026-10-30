@@ -1,43 +1,44 @@
 {% extends "base.html" %}
 
-{% block title %}Personalised Catch-Up Brief — ContextKeeper{% endblock %}
+{% block title %}Briefs — ContextKeeper{% endblock %}
 
 {% block content %}
 <div x-data="catchupApp()">
+  <!-- Page Header: Short Subtitle (<= 8 words) -->
   <div class="mb-8">
-    <h1 class="text-2xl font-bold tracking-tight text-slate-900">Personalised Catch-Up Brief</h1>
-    <p class="text-sm text-slate-500 mt-1">Zero context loss: tailored brief for whoever was on leave, missed an invite, or is taking over an initiative.</p>
+    <h1 class="text-2xl sm:text-3xl font-heading font-bold text-ink tracking-tight">Personalised Catch-Up Brief</h1>
+    <p class="text-sm text-ink-muted mt-1">Targeted briefs for missed sessions or leave.</p>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Left 1 Col: Picker Form -->
-    <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm h-fit">
-      <h2 class="text-sm font-bold uppercase text-slate-500 tracking-wider mb-4">Generate Brief</h2>
+    <!-- Left 1 Col: Selector Form -->
+    <div class="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-sm h-fit">
+      <h2 class="text-xs font-heading font-bold uppercase text-ink-muted tracking-wider mb-4">Generate Targeted Brief</h2>
 
       <form @submit.prevent="generateBrief()" class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase">1. Select Teammate</label>
-          <select x-model="selectedPersonId" required class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500">
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">1. Select Teammate</label>
+          <select x-model="selectedPersonId" required class="mt-1 w-full text-xs rounded-xl border-slate-300 p-2.5 focus:ring-2 focus:ring-[#283048] bg-slate-50/50">
             <option value="" disabled selected>Choose colleague...</option>
             {% for p in people %}
-            <option value="{{ p.id }}">{{ p.name }} ({{ p.role }}) {% if p.availability == 'on_leave' %}[On Leave]{% endif %}</option>
+            <option value="{{ p.id }}">{{ p.name }} ({{ p.role }}) {% if p.availability.value == 'on_leave' or p.availability == 'on_leave' %}[On Leave]{% endif %}</option>
             {% endfor %}
           </select>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase">2. Select Meeting or Handover</label>
-          <select x-model="selectedMeetingId" required class="mt-1 w-full text-xs rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500">
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">2. Select Session or Handover</label>
+          <select x-model="selectedMeetingId" required class="mt-1 w-full text-xs rounded-xl border-slate-300 p-2.5 focus:ring-2 focus:ring-[#283048] bg-slate-50/50">
             <option value="" disabled selected>Choose session...</option>
             {% for m in meetings %}
-            <option value="{{ m.id }}">#{{ m.id }} - {{ m.title }} ({{ m.status }})</option>
+            <option value="{{ m.id }}">#{{ m.id }} - {{ m.title }} ({{ m.status | human_status }})</option>
             {% endfor %}
           </select>
         </div>
 
         <div class="pt-2">
-          <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 text-xs font-bold rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm disabled:opacity-50 transition-all">
-            <span x-show="!loading">⚡ Generate Personalised Brief</span>
+          <button type="submit" :disabled="loading" class="w-full py-2.5 px-4 text-xs font-semibold rounded-xl text-white brand-gradient shadow-sm hover:opacity-95 active:scale-95 disabled:opacity-50 transition-all duration-150">
+            <span x-show="!loading">Generate Personalised Brief</span>
             <span x-show="loading">Synthesizing Context...</span>
           </button>
         </div>
@@ -46,60 +47,75 @@
 
     <!-- Right 2 Cols: Brief Display -->
     <div class="lg:col-span-2">
-      <div x-show="!brief && !loading" class="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center">
-        <div class="text-3xl mb-2">📬</div>
-        <h3 class="text-sm font-bold text-slate-900">No Brief Generated Yet</h3>
-        <p class="text-xs text-slate-500 mt-1">Select a teammate and meeting on the left to extract what they must know, what is expected of them, and overdue items.</p>
+      <!-- Empty State -->
+      <div x-show="!brief && !loading" class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+        <div class="w-10 h-10 rounded-full bg-slate-100 text-[#283048] flex items-center justify-center mx-auto mb-2 text-sm font-bold">
+          ⚡
+        </div>
+        <h3 class="text-sm font-heading font-semibold text-ink">No Brief Generated</h3>
+        <p class="text-xs text-ink-muted mt-1">Select a colleague and session to synthesize custom context and expectations.</p>
       </div>
 
-      <div x-show="loading" class="bg-white rounded-xl border border-slate-200 p-12 text-center shadow-sm">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-3"></div>
-        <p class="text-xs font-semibold text-slate-700">Synthesizing personal context, attendance history, and action items...</p>
+      <!-- Animated Shimmer Loading State -->
+      <div x-cloak x-show="loading" class="bg-white rounded-2xl border border-slate-200/90 p-8 shadow-sm space-y-4">
+        <div class="flex items-center justify-between text-xs text-ink">
+          <span class="font-semibold">Synthesizing personal context, attendance, and open items...</span>
+          <span class="text-ink-muted">AI processing</span>
+        </div>
+        <div class="w-full h-2 rounded-full overflow-hidden bg-slate-100">
+          <div class="h-full skeleton-shimmer rounded-full"></div>
+        </div>
       </div>
 
-      <div x-show="brief && !loading" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+      <!-- Result Card -->
+      <div x-cloak x-show="brief && !loading" class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden animate-enter">
+        <div class="px-6 py-4 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-bold uppercase tracking-wide text-slate-700" x-text="'Brief for ' + brief?.person_name"></span>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
-              ✨ AI-GENERATED
+            <span class="text-xs font-heading font-bold text-ink" x-text="'Brief for ' + brief?.person_name"></span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-ok font-semibold border border-emerald-200 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-ok"></span>
+              AI-Generated
             </span>
           </div>
-          <button @click="copyBrief()" class="px-3 py-1.5 text-xs font-semibold rounded-md bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-sm">
-            📋 Copy Brief
+          <button @click="copyBrief()" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-ink hover:bg-slate-50 shadow-2xs transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+            <span x-text="copied ? 'Copied!' : 'Copy Brief'"></span>
           </button>
         </div>
 
         <div class="p-6 space-y-6">
           <!-- What you must know -->
           <div>
-            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">📖 What You Need to Know</h3>
-            <p class="text-xs text-slate-800 leading-relaxed bg-slate-50 p-4 rounded-lg border border-slate-100" x-text="brief?.what_to_know"></p>
+            <h3 class="text-xs font-heading font-bold uppercase text-ink-muted tracking-wider mb-2">What You Need to Know</h3>
+            <p class="text-xs text-slate-700 leading-relaxed bg-slate-50/70 p-4 rounded-xl border border-slate-100" x-text="brief?.what_to_know"></p>
           </div>
 
           <!-- Expected of you -->
           <div>
-            <h3 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">🎯 Expected of You</h3>
+            <h3 class="text-xs font-heading font-bold uppercase text-ink-muted tracking-wider mb-2">Expected of You</h3>
             <div class="space-y-2">
               <template x-for="(exp, i) in brief?.expected_of_you" :key="i">
                 <div class="flex items-start gap-2 text-xs text-slate-800">
-                  <span class="text-indigo-600 font-bold">👉</span>
+                  <span class="text-[#283048] font-bold">•</span>
                   <span x-text="exp"></span>
                 </div>
               </template>
               <template x-if="!brief?.expected_of_you || brief?.expected_of_you.length === 0">
-                <div class="text-xs text-slate-400 italic">No specific actions assigned to you.</div>
+                <div class="text-xs text-slate-400 italic">No specific action items assigned to you.</div>
               </template>
             </div>
           </div>
 
           <!-- Overdue items -->
           <div>
-            <h3 class="text-xs font-bold uppercase text-rose-600 tracking-wider mb-2">⚠️ Overdue Items to Watch</h3>
+            <h3 class="text-xs font-heading font-bold uppercase text-danger tracking-wider mb-2">Overdue Items to Watch</h3>
             <div class="space-y-2">
               <template x-for="(ov, j) in brief?.overdue_items" :key="j">
-                <div class="flex items-start gap-2 text-xs text-rose-800 bg-rose-50 p-2.5 rounded border border-rose-100">
-                  <span>🚨</span>
+                <div class="flex items-start gap-2 text-xs text-danger bg-rose-50/70 p-3 rounded-xl border border-rose-100">
+                  <span class="font-bold">•</span>
                   <span x-text="ov"></span>
                 </div>
               </template>
@@ -122,6 +138,7 @@ function catchupApp() {
     selectedPersonId: '',
     selectedMeetingId: '',
     loading: false,
+    copied: false,
     brief: null,
 
     async generateBrief() {
@@ -152,12 +169,12 @@ function catchupApp() {
 
     copyBrief() {
       if (!this.brief) return;
-      const text = `CATCH-UP BRIEF for ${this.brief.person_name}\nMeeting: ${this.brief.meeting_title}\n\nWHAT TO KNOW:\n${this.brief.what_to_know}\n\nEXPECTED OF YOU:\n${(this.brief.expected_of_you || []).map(x => '- ' + x).join('\n')}\n\nOVERDUE ITEMS:\n${(this.brief.overdue_items || []).map(x => '- ' + x).join('\n')}`;
+      const text = `CATCH-UP BRIEF for ${this.brief.person_name}\nSession: ${this.brief.meeting_title}\n\nWHAT TO KNOW:\n${this.brief.what_to_know}\n\nEXPECTED OF YOU:\n${(this.brief.expected_of_you || []).map(x => '- ' + x).join('\n')}\n\nOVERDUE ITEMS:\n${(this.brief.overdue_items || []).map(x => '- ' + x).join('\n')}`;
       navigator.clipboard.writeText(text);
-      alert('Brief copied to clipboard!');
+      this.copied = true;
+      setTimeout(() => this.copied = false, 2000);
     }
   }
 }
 </script>
 {% endblock %}
-

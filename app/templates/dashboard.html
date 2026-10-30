@@ -1,113 +1,175 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard & Risk Radar — ContextKeeper{% endblock %}
+{% block title %}Radar — ContextKeeper{% endblock %}
 
 {% block content %}
 <div x-data="dashboardApp()">
-  <!-- Top Section: Overview Metrics -->
-  <div class="mb-8">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900">Handover Risk Radar</h1>
-        <p class="text-sm text-slate-500 mt-1">Real-time context loss detection, transparent scoring signals, and AI smart actions.</p>
+  <!-- Page Header: Title, Short Subtitle (<= 8 words), Single Primary CTA -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-heading font-bold text-ink tracking-tight">Handover Risk Radar</h1>
+      <p class="text-sm text-ink-muted mt-1">Real-time context-loss detection & automated smart actions.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <button @click="refreshRadar()" :disabled="refreshing" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-ink-muted hover:text-ink bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-sm transition-all duration-150">
+        <svg class="w-3.5 h-3.5" :class="refreshing ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        <span>Refresh</span>
+      </button>
+      <a href="/meetings?action=new" class="inline-flex items-center gap-2 px-4 py-2 brand-gradient text-white rounded-xl shadow-sm text-xs font-semibold hover:opacity-95 active:scale-95 transition-all duration-150">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        <span>New Meeting</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Metric Stat Cards: Minimal text, Number + 2-Word Label + Trend, Sora Font -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <!-- Stat 1: Critical Risk -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-danger">Critical Risk</span>
+        <span class="w-2 h-2 rounded-full bg-danger animate-pulse"></span>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="/meetings?action=new" class="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-          + New Meeting
-        </a>
+      <div class="mt-3 flex items-baseline justify-between">
+        <div class="text-3xl font-heading font-bold text-ink" x-text="criticalCount">0</div>
+        <span class="text-[11px] text-danger font-medium bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">Score &ge; 60</span>
       </div>
     </div>
 
-    <!-- Quick Stats Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div class="text-xs font-semibold text-rose-600 uppercase tracking-wider">Critical Risk Items</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <div class="text-3xl font-extrabold text-slate-900" x-text="criticalCount">0</div>
-          <span class="text-xs text-rose-600 font-medium">Score ≥ 60</span>
-        </div>
+    <!-- Stat 2: Overdue Tasks -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-warn">Overdue Tasks</span>
+        <svg class="w-3.5 h-3.5 text-warn" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
       </div>
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Open Overdue Items</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <div class="text-3xl font-extrabold text-slate-900" x-text="overdueCount">0</div>
-          <span class="text-xs text-amber-600 font-medium">Needs Attention</span>
-        </div>
+      <div class="mt-3 flex items-baseline justify-between">
+        <div class="text-3xl font-heading font-bold text-ink" x-text="overdueCount">0</div>
+        <span class="text-[11px] text-warn font-medium bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">Immediate</span>
       </div>
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Team On Leave</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <div class="text-3xl font-extrabold text-slate-900">{{ people_on_leave | length }}</div>
-          <span class="text-xs text-slate-500">Requires handover</span>
-        </div>
+    </div>
+
+    <!-- Stat 3: Team on Leave -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-info">Colleagues Leave</span>
+        <svg class="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
       </div>
-      <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-        <div class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Upcoming Meetings</div>
-        <div class="mt-2 flex items-baseline justify-between">
-          <div class="text-3xl font-extrabold text-slate-900">{{ upcoming_meetings | length }}</div>
-          <span class="text-xs text-indigo-600 font-medium">Next 7 days</span>
-        </div>
+      <div class="mt-3 flex items-baseline justify-between">
+        <div class="text-3xl font-heading font-bold text-ink">{{ people_on_leave | length }}</div>
+        <span class="text-[11px] text-info font-medium bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">Handover Req</span>
+      </div>
+    </div>
+
+    <!-- Stat 4: Upcoming Syncs -->
+    <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-[#283048]">Upcoming Syncs</span>
+        <svg class="w-3.5 h-3.5 text-[#283048]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </div>
+      <div class="mt-3 flex items-baseline justify-between">
+        <div class="text-3xl font-heading font-bold text-ink">{{ upcoming_meetings | length }}</div>
+        <span class="text-[11px] text-[#283048] font-medium bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">Next 7d</span>
       </div>
     </div>
   </div>
 
   <!-- Main Grid: Radar List on Left, Context & Team on Right -->
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Left 2 Cols: Risk Radar Table -->
-    <div class="lg:col-span-2 space-y-6">
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50/50">
-          <div>
-            <h2 class="text-base font-semibold text-slate-900">Open Action Items by Context-Loss Risk</h2>
-            <p class="text-xs text-slate-500">Transparent score (0-100) based on overdue state, attendance, leave, and carry-forward count.</p>
+    <!-- Left 2 Cols: Risk Radar List -->
+    <div class="lg:col-span-2 space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-heading font-bold text-ink">Action Items by Context-Loss Risk</h2>
+            <span class="text-xs bg-slate-200/70 text-ink-muted px-2 py-0.5 rounded-full font-semibold" x-text="radarItems.length"></span>
           </div>
-          <button @click="refreshRadar()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
-            ↻ Refresh
-          </button>
+          <span class="text-[11px] text-ink-muted font-medium">Deterministic Score (0-100)</span>
         </div>
 
-        <!-- Table -->
-        <div class="divide-y divide-slate-200">
+        <!-- Risk Items List -->
+        <div class="divide-y divide-slate-100">
           <template x-for="item in radarItems" :key="item.item_id">
-            <div class="p-5 hover:bg-slate-50/80 transition-colors">
+            <div class="p-5 hover:bg-slate-50/70 transition-colors duration-150">
               <div class="flex items-start justify-between gap-4">
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <!-- Risk Score Pill -->
+                  <!-- Row 1: Score Badge + Item Title -->
+                  <div class="flex items-center gap-3">
+                    <!-- Clean Score Pill Badge -->
                     <span :class="{
-                      'bg-rose-100 text-rose-800 border-rose-200': item.risk_score >= 60,
-                      'bg-amber-100 text-amber-800 border-amber-200': item.risk_score >= 30 && item.risk_score < 60,
-                      'bg-emerald-100 text-emerald-800 border-emerald-200': item.risk_score < 30
-                    }" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border">
-                      Risk <span x-text="item.risk_score"></span>/100
+                      'bg-rose-50 text-danger border-rose-200': item.risk_score >= 60,
+                      'bg-amber-50 text-warn border-amber-200': item.risk_score >= 30 && item.risk_score < 60,
+                      'bg-emerald-50 text-ok border-emerald-200': item.risk_score < 30
+                    }" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-heading font-bold border flex-shrink-0 shadow-2xs">
+                      <span class="text-[10px] uppercase tracking-wider text-slate-400 font-normal">Risk</span>
+                      <span x-text="item.risk_score"></span>
                     </span>
-                    <a :href="'/items#' + item.item_id" class="text-sm font-medium text-slate-900 hover:text-indigo-600 truncate" x-text="item.item_title"></a>
+
+                    <!-- Title -->
+                    <a :href="'/items#' + item.item_id" class="text-sm font-semibold text-ink hover:text-[#283048] transition-colors truncate" x-text="item.item_title"></a>
                   </div>
 
-                  <!-- Fired Signals Tag List -->
-                  <div class="mt-2 flex flex-wrap gap-1.5">
-                    <template x-for="sig in item.signals" :key="sig.signal">
-                      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700 border border-slate-200">
-                        ⚡ <span class="ml-1" x-text="sig.description"></span>
+                  <!-- Row 2: Owner Avatar + 2-3 Signal Chips (Clean, No Duplication) -->
+                  <div class="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+                    <!-- Owner Avatar Tag -->
+                    <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100 text-ink-muted font-medium border border-slate-200/60">
+                      <div class="w-4 h-4 rounded-full bg-[#283048] text-white flex items-center justify-center text-[9px] font-bold">
+                        <span x-text="getInitials(item.owner_name)"></span>
+                      </div>
+                      <span x-text="item.owner_name"></span>
+                    </div>
+
+                    <!-- Fired Signal Chips (Max 3, short labels) -->
+                    <template x-for="(sig, idx) in item.signals.slice(0, 3)" :key="sig.signal">
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-[#1B2233] border border-slate-200/80">
+                        <span class="text-slate-400">•</span>
+                        <span x-text="formatSignal(sig)"></span>
                       </span>
                     </template>
+
+                    <!-- Expand/Collapse for Detailed Signal Breakdown -->
+                    <button @click="toggleDetails(item.item_id)" class="text-[11px] text-[#4A6FA5] hover:underline font-medium">
+                      <span x-text="expandedId === item.item_id ? 'Less info' : (item.signals.length > 3 ? `+${item.signals.length - 3} more` : 'Details')"></span>
+                    </button>
                   </div>
 
-                  <!-- Owner Info -->
-                  <div class="mt-2 text-xs text-slate-500 flex items-center gap-2">
-                    <span>Owner: <strong class="text-slate-700" x-text="item.owner_name"></strong></span>
-                    <span>•</span>
-                    <span x-text="item.ai_why" class="italic text-slate-600"></span>
+                  <!-- Expandable Detailed Reasoning -->
+                  <div x-cloak x-show="expandedId === item.item_id" 
+                       x-transition:enter="transition ease-out duration-150"
+                       x-transition:enter-start="opacity-0 -translate-y-1"
+                       x-transition:enter-end="opacity-100 translate-y-0"
+                       class="mt-3 p-3 bg-slate-50/80 rounded-xl border border-slate-200/70 text-xs text-ink-muted space-y-1.5">
+                    <div class="font-semibold text-ink text-[11px] uppercase tracking-wide">All Active Risk Signals:</div>
+                    <template x-for="s in item.signals" :key="s.signal">
+                      <div class="flex items-start gap-1.5 text-[11px]">
+                        <span class="text-danger">•</span>
+                        <span class="text-slate-700" x-text="s.description"></span>
+                      </div>
+                    </template>
                   </div>
                 </div>
 
-                <!-- Action Buttons: Smart Nudge & Suggest Reassign -->
-                <div class="flex items-center gap-2 flex-shrink-0">
-                  <button @click="openNudge(item)" title="Generate AI Nudge Message" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200">
-                    ✉️ Nudge
+                <!-- Action Buttons: Primary Reassign + Ghost Nudge with Tooltips -->
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <button @click="openNudge(item)" title="Draft AI Nudge Reminder" class="p-2 rounded-xl text-ink-muted hover:text-[#283048] hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
                   </button>
-                  <button @click="openReassign(item)" title="Auto-Suggest Reassignment" class="px-2.5 py-1.5 text-xs font-medium rounded-md bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200">
-                    🔄 Reassign
+                  <button @click="openReassign(item)" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-[#283048] text-ink hover:text-white border border-slate-200/80 hover:border-transparent transition-all duration-150">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    <span>Reassign</span>
                   </button>
                 </div>
               </div>
@@ -115,148 +177,184 @@
           </template>
 
           <template x-if="radarItems.length === 0">
-            <div class="p-8 text-center text-sm text-slate-500">
-              🎉 No open at-risk action items! All context is cleanly handed over.
+            <div class="p-12 text-center">
+              <div class="w-10 h-10 rounded-full bg-emerald-50 text-ok flex items-center justify-center mx-auto mb-2 text-sm font-bold">✓</div>
+              <h3 class="text-sm font-heading font-semibold text-ink">Zero Critical Risk</h3>
+              <p class="text-xs text-ink-muted mt-1">All context is cleanly preserved and owned.</p>
             </div>
           </template>
         </div>
       </div>
     </div>
 
-    <!-- Right 1 Col: People On Leave & Upcoming Meetings -->
+    <!-- Right 1 Col: Team on Leave & Upcoming Sessions -->
     <div class="space-y-6">
-      <!-- People on leave panel -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h3 class="text-sm font-semibold text-slate-900 flex items-center justify-between">
-          <span>🏖️ Team On Leave / OOO</span>
-          <span class="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">{{ people_on_leave | length }}</span>
-        </h3>
-        <p class="text-xs text-slate-500 mt-1">High risk of dropped context if items remain assigned.</p>
+      <!-- Colleagues on Leave -->
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs font-heading font-bold uppercase tracking-wider text-ink">Teammates on Leave</h3>
+            <span class="text-[10px] bg-slate-100 text-ink-muted px-2 py-0.5 rounded-full font-semibold">{{ people_on_leave | length }}</span>
+          </div>
+          <span class="text-[10px] text-danger font-semibold uppercase">OOO</span>
+        </div>
         
-        <div class="mt-4 divide-y divide-slate-100">
+        <div class="mt-3 divide-y divide-slate-100">
           {% for p in people_on_leave %}
           <div class="py-3 flex items-center justify-between text-xs">
-            <div>
-              <div class="font-medium text-slate-900">{{ p.name }}</div>
-              <div class="text-slate-500">{{ p.role }}</div>
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-full brand-gradient text-white flex items-center justify-center text-[10px] font-bold">
+                {{ p.name | initials }}
+              </div>
+              <div>
+                <div class="font-semibold text-ink">{{ p.name }}</div>
+                <div class="text-[11px] text-ink-muted">{{ p.role }}</div>
+              </div>
             </div>
             <div class="text-right">
-              <span class="inline-block px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-medium">On Leave</span>
+              <span class="inline-block px-2 py-0.5 rounded-md bg-rose-50 text-danger text-[10px] font-medium border border-rose-100">On Leave</span>
               {% if p.leave_start and p.leave_end %}
-              <div class="text-slate-400 mt-0.5">{{ p.leave_start.strftime('%b %d') }} - {{ p.leave_end.strftime('%b %d') }}</div>
+              <div class="text-[10px] text-ink-muted mt-0.5">{{ p.leave_start.strftime('%b %d') }} - {{ p.leave_end.strftime('%b %d') }}</div>
               {% endif %}
             </div>
           </div>
           {% else %}
-          <div class="text-xs text-slate-500 py-3 text-center">No teammates currently on leave.</div>
+          <div class="text-xs text-ink-muted py-4 text-center">No teammates currently on leave.</div>
           {% endfor %}
         </div>
       </div>
 
-      <!-- Upcoming meetings panel -->
-      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-        <h3 class="text-sm font-semibold text-slate-900 flex items-center justify-between">
-          <span>📅 Upcoming Sessions</span>
-          <a href="/meetings" class="text-xs text-indigo-600 hover:underline">View All</a>
-        </h3>
-        <div class="mt-4 divide-y divide-slate-100">
+      <!-- Upcoming Sessions -->
+      <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-5">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs font-heading font-bold uppercase tracking-wider text-ink">Upcoming Sessions</h3>
+            <span class="text-[10px] bg-slate-100 text-ink-muted px-2 py-0.5 rounded-full font-semibold">{{ upcoming_meetings | length }}</span>
+          </div>
+          <a href="/meetings" class="text-xs text-[#4A6FA5] hover:underline font-semibold">View All</a>
+        </div>
+
+        <div class="mt-3 divide-y divide-slate-100">
           {% for m in upcoming_meetings %}
           <div class="py-3 text-xs">
             <div class="flex items-center justify-between">
-              <a href="/meetings/{{ m.id }}" class="font-medium text-slate-900 hover:text-indigo-600">{{ m.title }}</a>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-slate-100 text-slate-700">{{ m.status }}</span>
+              <a href="/meetings/{{ m.id }}" class="font-semibold text-ink hover:text-[#283048] transition-colors truncate max-w-[200px]">{{ m.title }}</a>
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase bg-slate-100 text-ink-muted">{{ m.status | human_status }}</span>
             </div>
-            <div class="text-slate-500 mt-1 flex items-center justify-between">
-              <span>{{ m.scheduled_at.strftime('%a, %b %d • %I:%M %p') if m.scheduled_at else 'TBD' }}</span>
-              <span>{{ m.meeting_type }}</span>
+            <div class="text-[11px] text-ink-muted mt-1 flex items-center justify-between">
+              <span>{{ m.scheduled_at | human_date }}</span>
+              <span class="capitalize">{{ m.meeting_type | human_type }}</span>
             </div>
           </div>
           {% else %}
-          <div class="text-xs text-slate-500 py-3 text-center">No upcoming meetings scheduled.</div>
+          <div class="text-xs text-ink-muted py-4 text-center">No upcoming meetings scheduled.</div>
           {% endfor %}
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Nudge Modal -->
-  <div x-cloak x-show="showNudgeModal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/50">
-    <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl" @click.outside="showNudgeModal = false">
+  <!-- Nudge Modal with Motion -->
+  <div x-cloak x-show="showNudgeModal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200" @click.outside="showNudgeModal = false">
       <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">AI Smart Nudge</h3>
-        <button @click="showNudgeModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg brand-gradient text-white flex items-center justify-center text-xs">
+            ✉️
+          </div>
+          <h3 class="text-sm font-heading font-bold text-ink">AI Smart Nudge</h3>
+        </div>
+        <button @click="showNudgeModal = false" class="text-slate-400 hover:text-ink text-sm">✕</button>
       </div>
 
       <div class="mt-4 space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase">Item</label>
-          <div class="text-sm font-medium text-slate-900 mt-1" x-text="activeNudgeItem?.item_title"></div>
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">Target Item</label>
+          <div class="text-xs font-semibold text-ink mt-0.5" x-text="activeNudgeItem?.item_title"></div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase">Tone</label>
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">Communication Tone</label>
           <div class="flex gap-2 mt-1">
-            <button @click="generateNudgeText('friendly')" :class="nudgeTone === 'friendly' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded-md text-xs font-medium">
-              Friendly & Supportive 😊
+            <button @click="generateNudgeText('friendly')" :class="nudgeTone === 'friendly' ? 'brand-gradient text-white shadow-sm' : 'bg-slate-100 text-ink-muted hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">
+              Friendly & Supportive
             </button>
-            <button @click="generateNudgeText('firm')" :class="nudgeTone === 'firm' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded-md text-xs font-medium">
-              Firm & Direct 🎯
+            <button @click="generateNudgeText('firm')" :class="nudgeTone === 'firm' ? 'brand-gradient text-white shadow-sm' : 'bg-slate-100 text-ink-muted hover:bg-slate-200'" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all">
+              Firm & Direct
             </button>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase">Drafted Message</label>
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">Generated Message</label>
           <div class="mt-1 relative">
-            <textarea x-model="nudgeMessage" rows="4" class="w-full text-xs font-mono rounded-lg border-slate-300 p-2.5 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50"></textarea>
-            <div x-show="loadingNudge" class="absolute inset-0 bg-white/70 flex items-center justify-center text-xs font-medium text-indigo-600">
-              Generating with AI...
+            <textarea x-model="nudgeMessage" rows="4" class="w-full text-xs font-sans rounded-xl border-slate-300 p-3 focus:ring-2 focus:ring-[#283048] focus:border-transparent bg-slate-50/50 text-ink"></textarea>
+            <div x-show="loadingNudge" class="absolute inset-0 bg-white/80 backdrop-blur-xs flex items-center justify-center text-xs font-semibold text-[#283048] rounded-xl">
+              Synthesizing prompt with AI...
             </div>
           </div>
         </div>
       </div>
 
       <div class="mt-6 flex justify-end gap-2 pt-3 border-t border-slate-100">
-        <button @click="showNudgeModal = false" class="px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-md">Cancel</button>
-        <button @click="copyNudge()" class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
-          📋 Copy to Clipboard
+        <button @click="showNudgeModal = false" class="px-4 py-2 text-xs font-semibold text-ink-muted hover:bg-slate-100 rounded-xl">Cancel</button>
+        <button @click="copyNudge()" class="px-4 py-2 text-xs font-semibold text-white brand-gradient rounded-xl shadow-sm hover:opacity-95 active:scale-95 transition-all">
+          Copy to Clipboard
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Reassign Suggestion Modal -->
-  <div x-cloak x-show="showReassignModal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-slate-900/50">
-    <div class="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl" @click.outside="showReassignModal = false">
+  <!-- Reassign Modal with Motion -->
+  <div x-cloak x-show="showReassignModal" class="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200" @click.outside="showReassignModal = false">
       <div class="flex justify-between items-center pb-3 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">AI Reassignment Recommendation</h3>
-        <button @click="showReassignModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg brand-gradient text-white flex items-center justify-center text-xs">
+            🔄
+          </div>
+          <h3 class="text-sm font-heading font-bold text-ink">AI Reassignment Recommendation</h3>
+        </div>
+        <button @click="showReassignModal = false" class="text-slate-400 hover:text-ink text-sm">✕</button>
       </div>
 
       <div class="mt-4 space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-500 uppercase">Action Item</label>
-          <div class="text-sm font-medium text-slate-900 mt-1" x-text="activeReassignItem?.item_title"></div>
-          <div class="text-xs text-slate-500 mt-0.5">Current Owner: <span x-text="activeReassignItem?.owner_name"></span></div>
+          <label class="block text-[11px] font-semibold text-ink-muted uppercase">Action Item</label>
+          <div class="text-xs font-semibold text-ink mt-0.5" x-text="activeReassignItem?.item_title"></div>
+          <div class="text-[11px] text-ink-muted mt-0.5">Current Owner: <span class="font-medium text-ink" x-text="activeReassignItem?.owner_name"></span></div>
         </div>
 
-        <div x-show="loadingReassign" class="py-6 text-center text-xs font-medium text-indigo-600">
-          Analyzing team availability, roles, and past ownership...
+        <div x-show="loadingReassign" class="py-8 text-center text-xs font-semibold text-[#283048]">
+          <div class="w-6 h-6 border-2 border-[#283048] border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+          Analyzing skills, active load, and availability...
         </div>
 
-        <div x-show="!loadingReassign && reassignData" class="bg-indigo-50/50 border border-indigo-100 rounded-lg p-4 space-y-2">
+        <div x-show="!loadingReassign && reassignData" class="bg-slate-50 rounded-xl p-4 border border-slate-200/80 space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-indigo-900">Suggested Colleague:</span>
-            <span class="text-xs font-bold text-indigo-700" x-text="reassignData?.suggested_person_name"></span>
+            <span class="text-xs font-semibold text-ink">Suggested Teammate:</span>
+            <span class="text-xs font-heading font-bold text-[#283048]" x-text="reassignData?.suggested_person_name"></span>
           </div>
-          <p class="text-xs text-slate-600 leading-relaxed" x-text="reassignData?.reason"></p>
-          <div class="text-[10px] text-slate-400">Confidence: <span x-text="Math.round((reassignData?.confidence || 0) * 100)"></span>%</div>
+          <p class="text-xs text-ink-muted leading-relaxed" x-text="reassignData?.reason"></p>
+          <div class="text-[10px] text-ink-muted">Confidence: <span class="font-semibold text-ok" x-text="Math.round((reassignData?.confidence || 0) * 100) + '%'"></span></div>
         </div>
       </div>
 
       <div class="mt-6 flex justify-end gap-2 pt-3 border-t border-slate-100">
-        <button @click="showReassignModal = false" class="px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-md">Cancel</button>
-        <button @click="confirmReassignment()" :disabled="!reassignData" class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50">
+        <button @click="showReassignModal = false" class="px-4 py-2 text-xs font-semibold text-ink-muted hover:bg-slate-100 rounded-xl">Cancel</button>
+        <button @click="confirmReassignment()" :disabled="!reassignData" class="px-4 py-2 text-xs font-semibold text-white brand-gradient rounded-xl shadow-sm hover:opacity-95 active:scale-95 disabled:opacity-50 transition-all">
           Confirm Reassignment
         </button>
       </div>
@@ -270,6 +368,9 @@
 function dashboardApp() {
   return {
     radarItems: {{ radar_items_json | safe }},
+    expandedId: null,
+    refreshing: false,
+
     showNudgeModal: false,
     activeNudgeItem: null,
     nudgeTone: 'friendly',
@@ -288,7 +389,35 @@ function dashboardApp() {
       return this.radarItems.filter(i => i.signals.some(s => s.signal === 'overdue')).length;
     },
 
+    getInitials(name) {
+      if (!name) return '??';
+      const parts = name.trim().split(' ');
+      return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
+    },
+
+    formatSignal(sig) {
+      const labelMap = {
+        'overdue': 'Overdue',
+        'due_soon': 'Due soon',
+        'no_owner': 'Unassigned',
+        'owner_on_leave': 'Owner on leave',
+        'owner_missed_meeting': 'Missed meeting',
+        'carried_forward_many': 'Carried 3x+',
+        'carried_forward_some': 'Carried forward',
+        'blocked': 'Blocked',
+        'no_kb_link': 'No KB doc',
+        'no_recent_activity': 'Stale activity',
+        'reassigned_no_note': 'No handover note'
+      };
+      return labelMap[sig.signal] || sig.description;
+    },
+
+    toggleDetails(id) {
+      this.expandedId = this.expandedId === id ? null : id;
+    },
+
     async refreshRadar() {
+      this.refreshing = true;
       try {
         const res = await fetch('/api/risk');
         if (res.ok) {
@@ -296,6 +425,8 @@ function dashboardApp() {
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        this.refreshing = false;
       }
     },
 
@@ -376,4 +507,3 @@ function dashboardApp() {
 }
 </script>
 {% endblock %}
-
