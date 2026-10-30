@@ -25,8 +25,8 @@ COPY migrations/ migrations/
 COPY app/ app/
 
 # Writable data directories for the database, logs and uploads
-RUN mkdir -p /data/logs /data/uploads \
-    && chown -R appuser:appgroup /data
+RUN mkdir -p /data/logs /data/uploads /app/app/static \
+    && chown -R appuser:appgroup /data /app/app/static
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
